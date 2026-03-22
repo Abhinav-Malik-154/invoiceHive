@@ -1,21 +1,21 @@
 import nodemailer from "nodemailer";
-
+import { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM, CLIENT_URL } from "../config/env.js";
 const transporter = nodemailer.createTransport({
-  host:   process.env.SMTP_HOST,
-  port:   Number(process.env.SMTP_PORT) || 587,
+  host:   SMTP_HOST,
+  port:   Number(SMTP_PORT) || 587,
   secure: false, // true for 465, false for other ports
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
+    user: SMTP_USER,
+    pass: SMTP_PASS,
   },
 });
 
 // ── Send password reset email ─────────────────────────────────────────────────
 export const sendPasswordResetEmail = async (email, resetToken) => {
-  const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${resetToken}`;
+  const resetUrl = `${CLIENT_URL}/reset-password?token=${resetToken}`;
 
   await transporter.sendMail({
-    from:    process.env.EMAIL_FROM,
+    from:    EMAIL_FROM,
     to:      email,
     subject: "Reset your InvoiceHive password",
     html: `
@@ -41,7 +41,7 @@ export const sendPasswordResetEmail = async (email, resetToken) => {
 // ── Send welcome email ────────────────────────────────────────────────────────
 export const sendWelcomeEmail = async (email, name) => {
   await transporter.sendMail({
-    from:    process.env.EMAIL_FROM,
+    from:    EMAIL_FROM,
     to:      email,
     subject: "Welcome to InvoiceHive!",
     html: `
@@ -54,7 +54,7 @@ export const sendWelcomeEmail = async (email, name) => {
           <li>Send it — your client gets a PDF with a Pay Now button</li>
           <li>Get paid via Stripe</li>
         </ol>
-        <a href="${process.env.CLIENT_URL}/dashboard"
+        <a href="${CLIENT_URL}/dashboard"
            style="display:inline-block; padding: 12px 24px; background: #4338CA;
                   color: white; border-radius: 6px; text-decoration: none; margin: 16px 0;">
           Go to Dashboard

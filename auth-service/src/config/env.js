@@ -1,12 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-console.log('Loaded environment variables:', {
-    PORT: process.env.PORT,
-    MONGO_URI: process.env.MONGO_URI,
-    JWT_SECRET: process.env.JWT_SECRET,
-    JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN,
-});
 
 export const {
     PORT,
@@ -20,4 +14,19 @@ export const {
     GITHUB_CLIENT_SECRET,
     GITHUB_CALLBACK_URL,
     REDIS_URL,
+    NODE_ENV,
+    CLIENT_URL,
+    COOKIE_SECRET,
+    SMTP_HOST,
+    SMTP_PORT,
+    SMTP_USER,
+    SMTP_PASS,
+    EMAIL_FROM,
+    REFRESH_TOKEN_EXPIRES_IN,
+    ACCESS_TOKEN_EXPIRES_IN,
+    JWT_ACCESS_SECRET,
+    JWT_REFRESH_SECRET,
+    JWT_ACCESS_EXPIRES_IN,
+    JWT_REFRESH_EXPIRES_IN,
+
 } = process.env;    

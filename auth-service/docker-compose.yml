@@ -1,0 +1,73 @@
+version: "3.9"
+
+# ── Run just the auth service + its dependencies ─────────────────────────────
+# Usage: docker compose up --build
+# This is for developing the auth service in isolation
+
+services:
+  auth-service:
+    build: .
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - MONGO_URI=mongodb://mongo:27017/invoicehive_auth
+      - REDIS_URL=redis://redis:6379
+      - JWT_ACCESS_SECRET=dev_access_secret_change_in_prod
+      - JWT_REFRESH_SECRET=dev_refresh_secret_change_in_prod
+      - JWT_ACCESS_EXPIRES_IN=15m
+      - JWT_REFRESH_EXPIRES_IN=7d
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_CALLBACK_URL=http://localhost:3001/auth/oauth/google/callback
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+      - GITHUB_CALLBACK_URL=http://localhost:3001/auth/oauth/github/callback
+      - CLIENT_URL=http://localhost:3000
+      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - EMAIL_FROM=InvoiceHive <noreply@invoicehive.io>
+      - COOKIE_SECRET=dev_cookie_secret_change_in_prod
+    volumes:
+      - .:/app                         # Hot reload — code changes reflect instantly
+      - /app/node_modules              # Don't override node_modules with host
+    command: node --watch src/index.js # --watch = built-in Node.js hot reload
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"       # Expose for MongoDB Compass/debugging
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"         # Expose for RedisInsight/debugging
+    command: redis-server --appendonly yes  # Persist data
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mongo_data:
+  redis_data:

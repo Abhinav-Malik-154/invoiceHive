@@ -1,29 +1,30 @@
 import jwt from "jsonwebtoken";
 import redis from "../config/redis.js";
+import { JWT_ACCESS_SECRET, JWT_REFRESH_SECRET, JWT_ACCESS_EXPIRES_IN, JWT_REFRESH_EXPIRES_IN, NODE_ENV } from "../config/env.js";
 
 // ── Token generation ──────────────────────────────────────────────────────────
 
 export const generateAccessToken = (userId) =>
   jwt.sign(
     { sub: userId, type: "access" },
-    process.env.JWT_ACCESS_SECRET,
-    { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "15m" }
+    process.JWT_ACCESS_SECRET,
+    { expiresIn: JWT_ACCESS_EXPIRES_IN || "15m" }
   );
 
 export const generateRefreshToken = (userId) =>
   jwt.sign(
     { sub: userId, type: "refresh" },
-    process.env.JWT_REFRESH_SECRET,
-    { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "7d" }
+    JWT_REFRESH_SECRET,
+    { expiresIn: JWT_REFRESH_EXPIRES_IN || "7d" }
   );
 
 // ── Token verification ────────────────────────────────────────────────────────
 
 export const verifyAccessToken = (token) =>
-  jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+  jwt.verify(token, JWT_ACCESS_SECRET);
 
 export const verifyRefreshToken = (token) =>
-  jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+  jwt.verify(token, JWT_REFRESH_SECRET);
 
 // ── Redis: refresh token store ────────────────────────────────────────────────
 // We store refresh tokens in Redis so we can:
@@ -81,7 +82,7 @@ export const issueTokens = async (userId, res) => {
   // Set refresh token as httpOnly cookie — JS can't read it (XSS protection)
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
-    secure:   process.env.NODE_ENV === "production", // HTTPS only in prod
+    secure:   NODE_ENV === "production", // HTTPS only in prod
     sameSite: "strict",
     maxAge:   7 * 24 * 60 * 60 * 1000, // 7 days in ms
   });
