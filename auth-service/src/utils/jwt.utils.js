@@ -7,7 +7,7 @@ import { JWT_ACCESS_SECRET, JWT_REFRESH_SECRET, JWT_ACCESS_EXPIRES_IN, JWT_REFRE
 export const generateAccessToken = (userId) =>
   jwt.sign(
     { sub: userId, type: "access" },
-    process.JWT_ACCESS_SECRET,
+    JWT_ACCESS_SECRET,
     { expiresIn: JWT_ACCESS_EXPIRES_IN || "15m" }
   );
 
