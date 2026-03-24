@@ -1,0 +1,66 @@
+version: "3.9"
+
+services:
+  invoice-service:
+    build: .
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=development
+      - PORT=3003
+      - MONGO_URI=${MONGO_URI}
+      - JWT_ACCESS_SECRET=dev_access_secret_change_in_prod
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - MINIO_ENDPOINT=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET=invoicehive
+      - MINIO_USE_SSL=false
+      - STORAGE_PUBLIC_URL=http://localhost:9000/invoicehive
+      - INTERNAL_SECRET=dev_internal_secret_change_in_prod
+      - CLIENT_SERVICE_URL=http://host.docker.internal:3002
+      - CLIENT_URL=http://localhost:3000
+      - PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+    shm_size: "1gb"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: node --watch src/index.js
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  minio:
+    image: minio/minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - minio_data:/data
+
+volumes:
+  rabbitmq_data:
+  minio_data:

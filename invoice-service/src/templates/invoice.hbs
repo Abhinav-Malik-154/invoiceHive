@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Invoice {{invoiceNumber}}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      font-size: 14px;
+      color: #1e293b;
+      background: #ffffff;
+      padding: 48px;
+      line-height: 1.5;
+    }
+
+    /* ── Header ─────────────────────────────────────── */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 48px;
+      padding-bottom: 32px;
+      border-bottom: 2px solid #4338CA;
+    }
+
+    .logo-area { display: flex; align-items: center; gap: 12px; }
+
+    .logo-area img {
+      width: 56px;
+      height: 56px;
+      object-fit: contain;
+      border-radius: 8px;
+    }
+
+    .from-name {
+      font-size: 22px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .from-detail { font-size: 12px; color: #64748b; margin-top: 2px; }
+
+    .invoice-meta { text-align: right; }
+    .invoice-label {
+      font-size: 28px;
+      font-weight: 800;
+      color: #4338CA;
+      letter-spacing: -0.5px;
+    }
+    .invoice-number { font-size: 14px; color: #64748b; margin-top: 4px; }
+
+    /* ── Status badge ────────────────────────────────── */
+    .status-badge {
+      display: inline-block;
+      padding: 3px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 8px;
+    }
+    .status-paid     { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+    .status-sent     { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+    .status-overdue  { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+    .status-draft    { background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0; }
+
+    /* ── Bill to / from ──────────────────────────────── */
+    .parties {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 40px;
+      gap: 40px;
+    }
+    .party { flex: 1; }
+    .party-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #94a3b8;
+      margin-bottom: 8px;
+    }
+    .party-name { font-size: 16px; font-weight: 700; color: #0f172a; }
+    .party-company { font-size: 13px; color: #4338CA; font-weight: 600; margin-top: 2px; }
+    .party-detail { font-size: 12px; color: #64748b; margin-top: 3px; }
+
+    /* ── Dates row ───────────────────────────────────── */
+    .dates-row {
+      display: flex;
+      gap: 32px;
+      background: #f8fafc;
+      border-radius: 10px;
+      padding: 16px 24px;
+      margin-bottom: 32px;
+    }
+    .date-block { }
+    .date-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #94a3b8;
+    }
+    .date-value { font-size: 14px; font-weight: 600; color: #0f172a; margin-top: 2px; }
+    .date-value.overdue { color: #dc2626; }
+
+    /* ── Line items table ────────────────────────────── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 24px;
+    }
+    thead tr {
+      background: #0f172a;
+      color: #ffffff;
+    }
+    thead th {
+      padding: 12px 16px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      text-align: left;
+    }
+    thead th:last-child,
+    thead th:nth-child(2),
+    thead th:nth-child(3) { text-align: right; }
+
+    tbody tr { border-bottom: 1px solid #f1f5f9; }
+    tbody tr:nth-child(even) { background: #f8fafc; }
+
+    tbody td {
+      padding: 12px 16px;
+      font-size: 13px;
+      color: #334155;
+    }
+    tbody td:last-child,
+    tbody td:nth-child(2),
+    tbody td:nth-child(3) { text-align: right; }
+
+    td.description { font-weight: 500; color: #0f172a; }
+    td.unit-label  { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+
+    /* ── Totals ──────────────────────────────────────── */
+    .totals-wrapper {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 40px;
+    }
+    .totals {
+      width: 280px;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .totals-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 16px;
+      font-size: 13px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .totals-row:last-child { border-bottom: none; }
+    .totals-row.total-final {
+      background: #4338CA;
+      color: #ffffff;
+      font-size: 15px;
+      font-weight: 700;
+      padding: 14px 16px;
+    }
+    .totals-label { color: #64748b; }
+    .totals-row.total-final .totals-label { color: #c7d2fe; }
+
+    /* ── Payment section ─────────────────────────────── */
+    {{#if stripePaymentLinkUrl}}
+    .pay-section {
+      text-align: center;
+      margin-bottom: 40px;
+      padding: 24px;
+      background: #f8fafc;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+    }
+    .pay-label { font-size: 13px; color: #64748b; margin-bottom: 12px; }
+    .pay-button {
+      display: inline-block;
+      background: #4338CA;
+      color: #ffffff;
+      font-size: 15px;
+      font-weight: 700;
+      padding: 14px 36px;
+      border-radius: 8px;
+      text-decoration: none;
+      letter-spacing: 0.3px;
+    }
+    {{/if}}
+
+    /* ── Notes & terms ───────────────────────────────── */
+    .notes-section { margin-bottom: 32px; }
+    .notes-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #94a3b8;
+      margin-bottom: 6px;
+    }
+    .notes-text { font-size: 13px; color: #64748b; white-space: pre-wrap; }
+
+    /* ── Footer ──────────────────────────────────────── */
+    .footer {
+      border-top: 1px solid #e2e8f0;
+      padding-top: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: #94a3b8;
+    }
+    .footer-brand { font-weight: 600; color: #4338CA; }
+  </style>
+</head>
+<body>
+
+  <!-- ── Header ─────────────────────────────────────── -->
+  <div class="header">
+    <div class="logo-area">
+      {{#if fromDetails.logo}}
+        <img src="{{fromDetails.logo}}" alt="Logo"/>
+      {{/if}}
+      <div>
+        <div class="from-name">{{fromDetails.name}}</div>
+        {{#if fromDetails.email}}
+          <div class="from-detail">{{fromDetails.email}}</div>
+        {{/if}}
+        {{#if fromDetails.phone}}
+          <div class="from-detail">{{fromDetails.phone}}</div>
+        {{/if}}
+        {{#if fromDetails.address}}
+          <div class="from-detail">{{fromDetails.address}}</div>
+        {{/if}}
+      </div>
+    </div>
+    <div class="invoice-meta">
+      <div class="invoice-label">INVOICE</div>
+      <div class="invoice-number">{{invoiceNumber}}</div>
+      <div>
+        <span class="status-badge status-{{status}}">{{status}}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Bill to ────────────────────────────────────── -->
+  <div class="parties">
+    <div class="party">
+      <div class="party-label">Bill to</div>
+      <div class="party-name">{{toDetails.name}}</div>
+      {{#if toDetails.company}}
+        <div class="party-company">{{toDetails.company}}</div>
+      {{/if}}
+      {{#if toDetails.email}}
+        <div class="party-detail">{{toDetails.email}}</div>
+      {{/if}}
+      {{#if toDetails.address}}
+        <div class="party-detail">{{toDetails.address}}</div>
+      {{/if}}
+    </div>
+  </div>
+
+  <!-- ── Dates ──────────────────────────────────────── -->
+  <div class="dates-row">
+    <div class="date-block">
+      <div class="date-label">Invoice date</div>
+      <div class="date-value">{{issuedDateFormatted}}</div>
+    </div>
+    <div class="date-block">
+      <div class="date-label">Due date</div>
+      <div class="date-value {{#if isOverdue}}overdue{{/if}}">
+        {{dueDateFormatted}}{{#if isOverdue}} (Overdue){{/if}}
+      </div>
+    </div>
+    {{#if paidAt}}
+    <div class="date-block">
+      <div class="date-label">Paid on</div>
+      <div class="date-value">{{paidAtFormatted}}</div>
+    </div>
+    {{/if}}
+  </div>
+
+  <!-- ── Line items ─────────────────────────────────── -->
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 45%">Description</th>
+        <th style="width: 15%">Qty</th>
+        <th style="width: 15%">Rate</th>
+        <th style="width: 25%">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each lineItems}}
+      <tr>
+        <td class="description">
+          {{description}}
+          {{#if unit}}<div class="unit-label">per {{unit}}</div>{{/if}}
+        </td>
+        <td>{{quantity}}</td>
+        <td>{{currencySymbol}}{{formatNumber rate}}</td>
+        <td>{{currencySymbol}}{{formatNumber amount}}</td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+
+  <!-- ── Totals ─────────────────────────────────────── -->
+  <div class="totals-wrapper">
+    <div class="totals">
+      <div class="totals-row">
+        <span class="totals-label">Subtotal</span>
+        <span>{{currencySymbol}}{{formatNumber subtotal}}</span>
+      </div>
+      {{#if discount}}
+      <div class="totals-row">
+        <span class="totals-label">Discount</span>
+        <span>− {{currencySymbol}}{{formatNumber discount}}</span>
+      </div>
+      {{/if}}
+      {{#if taxRate}}
+      <div class="totals-row">
+        <span class="totals-label">Tax ({{taxRate}}%)</span>
+        <span>{{currencySymbol}}{{formatNumber taxAmount}}</span>
+      </div>
+      {{/if}}
+      <div class="totals-row total-final">
+        <span class="totals-label">Total</span>
+        <span>{{currency}} {{currencySymbol}}{{formatNumber total}}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Pay Now button ─────────────────────────────── -->
+  {{#if stripePaymentLinkUrl}}
+  <div class="pay-section">
+    <div class="pay-label">Pay securely online</div>
+    <a href="{{stripePaymentLinkUrl}}" class="pay-button">Pay Now — {{currency}} {{currencySymbol}}{{formatNumber total}}</a>
+  </div>
+  {{/if}}
+
+  <!-- ── Notes ──────────────────────────────────────── -->
+  {{#if notes}}
+  <div class="notes-section">
+    <div class="notes-label">Notes</div>
+    <div class="notes-text">{{notes}}</div>
+  </div>
+  {{/if}}
+
+  {{#if terms}}
+  <div class="notes-section">
+    <div class="notes-label">Terms & Conditions</div>
+    <div class="notes-text">{{terms}}</div>
+  </div>
+  {{/if}}
+
+  <!-- ── Footer ─────────────────────────────────────── -->
+  <div class="footer">
+    <span>Thank you for your business.</span>
+    <span class="footer-brand">InvoiceHive</span>
+  </div>
+
+</body>
+</html>
