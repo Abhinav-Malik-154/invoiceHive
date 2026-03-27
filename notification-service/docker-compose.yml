@@ -1,0 +1,40 @@
+services:
+  notification-service:
+    build: .
+    ports:
+      - "3005:3005"
+    environment:
+      - NODE_ENV=development
+      - PORT=3005
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - SMTP_HOST=${SMTP_HOST:-smtp.mailtrap.io}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - EMAIL_FROM=InvoiceHive <noreply@invoicehive.io>
+      - CLIENT_URL=http://localhost:3000
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: node --watch src/index.js
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  rabbitmq_data:
