@@ -2,7 +2,7 @@ services:
 
   # API gateway
   nginx:
-    build: ./gateway/nginx
+    build: ./gateway
     ports:
       - "80:80"
     depends_on:
@@ -14,18 +14,18 @@ services:
       - invoicehive_net
 
 
-  frontend:
-    build: ./client
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost
-    depends_on:
-      - nginx
-    networks:
-      - invoicehive_net
+  # frontend:
+  #   build: ./client
+  #   environment:
+  #     - NEXT_PUBLIC_API_URL=http://localhost
+  #   depends_on:
+  #     - nginx
+  #   networks:
+  #     - invoicehive_net
 
 
   auth-service:
-    build: ./services/auth-service
+    build: ./auth-service
     environment:
       - PORT=3001
       - NODE_ENV=development
@@ -44,7 +44,7 @@ services:
 
 
   client-service:
-    build: ./services/client-service
+    build: ./client-service
     environment:
       - PORT=3002
       - NODE_ENV=development
@@ -59,7 +59,7 @@ services:
 
 
   invoice-service:
-    build: ./services/invoice-service
+    build: ./invoice-service
     environment:
       - PORT=3003
 
@@ -88,7 +88,7 @@ services:
 
 
   payment-service:
-    build: ./services/payment-service
+    build: ./payment-service
     environment:
       - PORT=3004
 
@@ -111,7 +111,7 @@ services:
 
 
   notification-service:
-    build: ./services/notification-service
+    build: ./notification-service
     environment:
       - PORT=3005
 

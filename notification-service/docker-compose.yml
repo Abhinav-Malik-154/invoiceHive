@@ -11,7 +11,7 @@ services:
       - SMTP_PORT=${SMTP_PORT:-587}
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASS=${SMTP_PASS}
-      - EMAIL_FROM=InvoiceHive <noreply@invoicehive.io>
+      - EMAIL_FROM=${EMAIL_FROM}
       - CLIENT_URL=http://localhost:3000
     volumes:
       - .:/app

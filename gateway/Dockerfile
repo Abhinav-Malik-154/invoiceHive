@@ -4,10 +4,7 @@ FROM nginx:1.25-alpine
 RUN rm /etc/nginx/conf.d/default.conf
 
 # Copy our config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# Validate config on build — fails fast if nginx.conf has syntax errors
-RUN nginx -t
+COPY nginx/nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80 443
 
