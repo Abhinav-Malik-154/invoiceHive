@@ -246,11 +246,11 @@ export const sendInvoice = async (req, res, next) => {
     }
 
     // ── 1. Generate PDF ───────────────────────────────
-    console.log(`📄 Generating PDF for invoice ${invoice.invoiceNumber}...`);
+    console.log(`Generating PDF for invoice ${invoice.invoiceNumber}...`);
     const pdfBuffer = await generateInvoicePDF(invoice);
 
     // ── 2. Upload to MinIO ────────────────────────────
-    console.log(`☁️  Uploading PDF to MinIO...`);
+    console.log(` Uploading PDF to MinIO...`);
     const pdfUrl = await uploadPDF(invoice.userId, invoice._id.toString(), pdfBuffer);
 
     // ── 3. Update invoice ─────────────────────────────
@@ -271,11 +271,11 @@ export const sendInvoice = async (req, res, next) => {
       currency:      invoice.currency,
       dueDate:       invoice.dueDate,
       pdfUrl,
-      paymentUrl:    invoice.stripePaymentLinkUrl,
+      paymentUrl:    invoice.razorpayPaymentLinkUrl,
       fromName:      invoice.fromDetails.name,
     });
 
-    console.log(`✅ Invoice ${invoice.invoiceNumber} sent`);
+    console.log(`Invoice ${invoice.invoiceNumber} sent`);
 
     res.json({
       success: true,
@@ -340,7 +340,7 @@ export const markViewed = async (req, res, next) => {
 
 // ── POST /invoices/:id/mark-paid ──────────────────────────────────────────────
 // Manual payment marking (for cash/bank transfer payments)
-// Stripe payments are marked paid automatically via webhook in Payment Service
+// razorpay payments are marked paid automatically via webhook in Payment Service
 export const markPaid = async (req, res, next) => {
   try {
     const invoice = await findInvoiceOrFail(req.params.id, req.userId);
@@ -374,23 +374,30 @@ export const markPaid = async (req, res, next) => {
   }
 };
 
-// ── INTERNAL: POST /internal/invoices/:id/stripe-paid ─────────────────────────
-// Called by Payment Service after Stripe webhook fires
-export const stripeWebhookPaid = async (req, res, next) => {
+// ── INTERNAL: POST /internal/invoices/:id/razorpay-paid ─────────────────────────
+// Called by Payment Service after razorpay webhook fires
+export const razorpayWebhookPaid = async (req, res, next) => {
   try {
     const { invoiceId } = req.params;
-    const { stripePaymentIntentId, amount } = req.body;
+    const { razorpayPaymentId, amount } = req.body;
 
     const invoice = await Invoice.findById(invoiceId);
     if (!invoice) return invoiceNotFound(res);
     if (invoice.status === "paid") {
-      // Idempotency — Stripe can fire the same webhook twice
+      // Idempotency — Razorpay can fire the same webhook twice
       return res.json({ success: true, message: "Already paid — skipped" });
     }
 
-    invoice.status                = "paid";
-    invoice.paidAt                = new Date();
-    invoice.stripePaymentIntentId = stripePaymentIntentId;
+    // 🚨 SECURITY FIX: Check if they actually paid the full amount!
+    if (amount < invoice.total) {
+      invoice.status = "partially_paid";
+      console.warn(`Partial payment detected for invoice ${invoiceId}!`);
+    } else {
+      invoice.status = "paid";
+    }
+
+    invoice.paidAt             = new Date();
+    invoice.razorpayPaymentId  = razorpayPaymentId;
     await invoice.save();
 
     await publish("invoice.paid", {
@@ -402,7 +409,7 @@ export const stripeWebhookPaid = async (req, res, next) => {
       amount:        invoice.total,
       currency:      invoice.currency,
       paidAt:        invoice.paidAt,
-      method:        "stripe",
+      method:        "razorpay",
     });
 
     await syncClientStats(invoice.clientId, invoice.userId);
@@ -412,16 +419,15 @@ export const stripeWebhookPaid = async (req, res, next) => {
     next(err);
   }
 };
-
-// ── INTERNAL: Store Stripe Payment Link on invoice ────────────────────────────
+// ── INTERNAL: Store Razorpay Payment Link on invoice ────────────────────────────
 export const setPaymentLink = async (req, res, next) => {
   try {
     const { invoiceId } = req.params;
-    const { stripePaymentLinkId, stripePaymentLinkUrl } = req.body;
+    const { razorpayOrderId, checkoutUrl } = req.body;
 
     await Invoice.findByIdAndUpdate(invoiceId, {
-      stripePaymentLinkId,
-      stripePaymentLinkUrl,
+      razorpayOrderId: razorpayOrderId,
+      razorpayPaymentLinkUrl: checkoutUrl,
     });
 
     res.json({ success: true });

@@ -175,7 +175,7 @@
     .totals-row.total-final .totals-label { color: #c7d2fe; }
 
     /* ── Payment section ─────────────────────────────── */
-    {{#if stripePaymentLinkUrl}}
+    {{#if razorpayPaymentLinkUrl}}
     .pay-section {
       text-align: center;
       margin-bottom: 40px;
@@ -342,10 +342,10 @@
   </div>
 
   <!-- ── Pay Now button ─────────────────────────────── -->
-  {{#if stripePaymentLinkUrl}}
+  {{#if razorpayPaymentLinkUrl}}
   <div class="pay-section">
     <div class="pay-label">Pay securely online</div>
-    <a href="{{stripePaymentLinkUrl}}" class="pay-button">Pay Now — {{currency}} {{currencySymbol}}{{formatNumber total}}</a>
+    <a href="{{razorpayPaymentLinkUrl}}" class="pay-button">Pay Now — {{currency}} {{currencySymbol}}{{formatNumber total}}</a>
   </div>
   {{/if}}
 

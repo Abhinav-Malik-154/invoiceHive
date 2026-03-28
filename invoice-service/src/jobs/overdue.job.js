@@ -53,7 +53,7 @@ export const startOverdueCron = () => {
             currency:      invoice.currency,
             dueDate:       invoice.dueDate,
             pdfUrl:        invoice.pdfUrl,
-            paymentUrl:    invoice.stripePaymentLinkUrl,
+            paymentUrl:    invoice.razorpayPaymentLinkUrl,
             daysOverdue:   Math.floor((now - invoice.dueDate) / (1000 * 60 * 60 * 24)),
           });
         }

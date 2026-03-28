@@ -48,16 +48,17 @@ const invoiceSchema = new mongoose.Schema(
     // Auto-generated: INV-0001, INV-0002 per user
     invoiceNumber: {
       type:   String,
-      unique: true,
       index:  true,
     },
 
+
+    
     // ── Status lifecycle ───────────────────────────────
     // draft → sent → viewed → paid
     //                       ↘ overdue (if past dueDate and not paid)
     status: {
       type:    String,
-      enum:    ["draft", "sent", "viewed", "paid", "overdue", "cancelled"],
+      enum:    ["draft", "sent", "viewed", "paid", "partially_paid", "overdue", "cancelled"],
       default: "draft",
       index:   true,
     },
@@ -88,9 +89,10 @@ const invoiceSchema = new mongoose.Schema(
     paidAt:     { type: Date, default: null },
 
     // ── Payment details ────────────────────────────────
-    stripePaymentLinkId:   { type: String, default: null },
-    stripePaymentLinkUrl:  { type: String, default: null },
-    stripePaymentIntentId: { type: String, default: null },
+    razorpayOrderId:         { type: String, default: null },
+    razorpayPaymentLinkId:   { type: String, default: null },
+    razorpayPaymentLinkUrl:  { type: String, default: null },
+    razorpayPaymentIntentId: { type: String, default: null },
 
     // ── PDF storage ────────────────────────────────────
     pdfUrl: { type: String, default: null }, // MinIO public URL
@@ -130,19 +132,22 @@ invoiceSchema.index({ userId: 1, status: 1 });
 invoiceSchema.index({ userId: 1, createdAt: -1 });
 invoiceSchema.index({ userId: 1, dueDate: 1, status: 1 }); // For overdue cron
 invoiceSchema.index({ clientId: 1, status: 1 });
-
+invoiceSchema.index({ userId: 1, invoiceNumber: 1 }, { unique: true });
 // ── Pre-save: recalculate financials ──────────────────────────────────────────
 invoiceSchema.pre("save", function (next) {
   if (this.isModified("lineItems") || this.isModified("taxRate") || this.isModified("discount")) {
-    const subtotal   = this.lineItems.reduce((sum, item) => sum + item.amount, 0);
-    const discount   = this.discount || 0;
-    const taxable    = subtotal - discount;
-    const taxAmount  = parseFloat(((taxable * this.taxRate) / 100).toFixed(2));
-    const total      = parseFloat((taxable + taxAmount).toFixed(2));
+    const subtotal = this.lineItems.reduce((sum, item) => sum + item.amount, 0);
+    const discount = this.discount || 0;
+    
+    // Prevent negative taxable amounts
+    const taxable = Math.max(subtotal - discount, 0); 
+    
+    const taxAmount = parseFloat(((taxable * this.taxRate) / 100).toFixed(2));
+    const total = parseFloat((taxable + taxAmount).toFixed(2));
 
-    this.subtotal  = parseFloat(subtotal.toFixed(2));
+    this.subtotal = parseFloat(subtotal.toFixed(2));
     this.taxAmount = taxAmount;
-    this.total     = total;
+    this.total = total;
   }
   next();
 });
