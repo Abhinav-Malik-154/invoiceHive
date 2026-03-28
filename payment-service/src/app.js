@@ -12,17 +12,28 @@ const app = express();
 app.use(helmet());
 app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:3000", credentials: true }));
 
-// ── CRITICAL: Stripe webhook needs raw body ───────────────────────────────────
-// Apply express.raw() ONLY to the webhook route — BEFORE express.json()
-// If express.json() parses the body first, stripe.webhooks.constructEvent() fails
-// because it needs the original raw Buffer to verify the signature
-app.use(
-  "/payments/webhook",
-  express.raw({ type: "application/json" })
-);
+// ── Raw body capture for Razorpay webhook signature verification ──────────────
+// Razorpay sends regular JSON (unlike Stripe which needs a raw Buffer),
+// BUT we still need the raw body string to compute the HMAC-SHA256 signature.
+// We capture it here BEFORE express.json() parses and discards the original.
+//
+// req.rawBody is then used inside webhook.controller.js to verify the signature.
+// app.use((req, _res, next) => {
+//   let data = "";
+//   req.on("data", (chunk) => { data += chunk; });
+//   req.on("end", () => {
+//     req.rawBody = data;
+//     next();
+//   });
+// });
 
-// ── All other routes get parsed JSON ──────────────────────────────────────────
-app.use(express.json({ limit: "10kb" }));
+// ── All routes get parsed JSON ────────────────────────────────────────────────
+app.use(express.json({
+  limit: "10kb",
+  verify: (req, res, buf) => {
+    req.rawBody = buf.toString();
+  }
+}))
 
 if (process.env.NODE_ENV !== "test") app.use(morgan("dev"));
 

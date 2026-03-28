@@ -7,19 +7,26 @@ const paymentSchema = new mongoose.Schema(
     userId:    { type: String, required: true, index: true },
     clientId:  { type: String, required: true },
 
-    // ── Stripe identifiers ─────────────────────────────
-    stripePaymentLinkId:   { type: String, default: null },
-    stripePaymentLinkUrl:  { type: String, default: null },
-    stripePaymentIntentId: { type: String, default: null, unique: true, sparse: true },
-    stripeSessionId:       { type: String, default: null },
+    // ── Razorpay identifiers ───────────────────────────
+    // razorpayOrderId   — created when freelancer clicks "Send Invoice"
+    // razorpayPaymentId — filled by webhook after client pays
+    // razorpaySignature — stored for audit; verified in webhook
+    razorpayOrderId:   { type: String, default: null, index: true },
+    razorpayPaymentId: { type: String, default: null, unique: true, sparse: true },
+    razorpaySignature: { type: String, default: null },
+
+    // Hosted checkout URL we send to the client
+    // Built from key_id + order_id — no separate "payment link" API needed
+    checkoutUrl: { type: String, default: null },
 
     // ── Amount ────────────────────────────────────────
-    amount:   { type: Number, required: true }, // in major units (dollars not cents)
+    // Stored in MAJOR units (rupees, dollars — NOT paise/cents)
+    amount:   { type: Number, required: true },
     currency: { type: String, required: true, uppercase: true },
 
     // ── Status ────────────────────────────────────────
-    // pending   — Payment Link created, client hasn't paid yet
-    // succeeded — Stripe webhook confirmed payment
+    // pending   — Order created, client hasn't paid yet
+    // succeeded — Razorpay webhook confirmed payment
     // failed    — Payment attempt failed
     // refunded  — Payment was refunded
     status: {
@@ -29,19 +36,25 @@ const paymentSchema = new mongoose.Schema(
       index:   true,
     },
 
-    // ── Timestamps from Stripe ─────────────────────────
+    // ── Timestamps ────────────────────────────────────
     paidAt:     { type: Date, default: null },
     refundedAt: { type: Date, default: null },
 
-    // ── Raw Stripe event (for debugging/audit) ─────────
-    // Store the last relevant Stripe event payload
-    stripeEventId:   { type: String, default: null }, // For idempotency check
-    stripeEventType: { type: String, default: null },
+    // ── Razorpay event (for debugging/audit) ──────────
+    // razorpayEventId is used for idempotency — Razorpay sends the
+    // payment.captured event; we store razorpayPaymentId as the idempotency key
+    razorpayEventId:   { type: String, default: null },
+    razorpayEventType: { type: String, default: null },
 
-    // ── Payment method details (from Stripe) ──────────
-    paymentMethodType: { type: String, default: null }, // "card", "bank_transfer" etc.
+    // ── Payment method details (from Razorpay) ────────
+    paymentMethodType: { type: String, default: null }, // "card", "upi", "netbanking", "wallet"
     cardLast4:         { type: String, default: null },
-    cardBrand:         { type: String, default: null }, // "visa", "mastercard" etc.
+    cardBrand:         { type: String, default: null }, // "Visa", "Mastercard" etc.
+    upiId:             { type: String, default: null }, // filled for UPI payments
+    bank:              { type: String, default: null }, // filled for netbanking
+
+    // ── Refund tracking ────────────────────────────────
+    razorpayRefundId: { type: String, default: null },
   },
   {
     timestamps: true,
@@ -53,7 +66,7 @@ const paymentSchema = new mongoose.Schema(
 // ── Compound indexes ──────────────────────────────────────────────────────────
 paymentSchema.index({ userId: 1, createdAt: -1 });
 paymentSchema.index({ invoiceId: 1, status: 1 });
-paymentSchema.index({ stripeEventId: 1 }, { unique: true, sparse: true }); // Idempotency
+// razorpayPaymentId has unique:true + sparse:true above — acts as idempotency key
 
 const Payment = mongoose.model("Payment", paymentSchema);
 export default Payment;

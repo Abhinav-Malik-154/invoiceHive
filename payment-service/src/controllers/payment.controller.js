@@ -1,116 +1,142 @@
 import axios from "axios";
-import stripe from "../config/stripe.js";
+import razorpay from "../config/razorpay.js";
 import Payment from "../models/payment.model.js";
 import { publish } from "../config/rabbitmq.js";
 
-// Currency → Stripe currency code (lowercase)
-const CURRENCY_MAP = {
-  USD: "usd", EUR: "eur", GBP: "gbp", CAD: "cad",
-  AUD: "aud", INR: "inr", JPY: "jpy", SGD: "sgd", AED: "aed",
-};
+// Currency → ISO code (uppercase) — Razorpay supports these natively
+// Full list: https://razorpay.com/docs/payments/payments/international/
+const SUPPORTED_CURRENCIES = new Set([
+  "INR", "USD", "EUR", "GBP", "SGD", "AED", "AUD", "CAD", "JPY",
+]);
 
-// ── POST /payments/create-link ────────────────────────────────────────────────
+// Razorpay amounts are always in smallest unit (paise for INR, cents for USD…)
+// Exception: JPY has no decimals
+const ZERO_DECIMAL_CURRENCIES = new Set(["JPY", "KRW", "VND"]);
+
+const toSmallestUnit = (amount, currency) =>
+  ZERO_DECIMAL_CURRENCIES.has(currency.toUpperCase())
+    ? Math.round(amount)
+    : Math.round(amount * 100);
+
+// ── POST /payments/create-order ───────────────────────────────────────────────
 // Called by frontend when freelancer clicks "Send Invoice"
-// Creates a Stripe Payment Link and stores it on the invoice
-export const createPaymentLink = async (req, res, next) => {
+// Creates a Razorpay Order and returns a hosted checkout URL
+export const createPaymentOrder = async (req, res, next) => {
   try {
-    const { invoiceId, invoiceNumber, amount, currency, clientName, clientEmail } = req.body;
+    const {
+      invoiceId, invoiceNumber, amount, currency = "INR",
+      clientName, clientEmail, clientId,
+    } = req.body;
 
-    // Check if a Payment Link already exists for this invoice
+    const upperCurrency = currency.toUpperCase();
+     
+
+
+    if (typeof amount !== 'number' || amount <= 0) {
+  return res.status(400).json({ success: false, message: "Invalid amount" });
+}
+
+    if (!SUPPORTED_CURRENCIES.has(upperCurrency)) {
+      return res.status(400).json({
+        success: false,
+        message: `Currency ${upperCurrency} is not supported. Supported: ${[...SUPPORTED_CURRENCIES].join(", ")}`,
+      });
+    }
+
+    // Return existing pending order — avoids duplicate charges
     const existing = await Payment.findOne({ invoiceId, status: "pending" });
-    if (existing?.stripePaymentLinkUrl) {
+    if (existing?.checkoutUrl) {
       return res.json({
         success: true,
-        message: "Payment link already exists",
+        message: "Order already exists",
         data: {
-          paymentLinkUrl: existing.stripePaymentLinkUrl,
-          paymentLinkId:  existing.stripePaymentLinkId,
+          checkoutUrl:     existing.checkoutUrl,
+          razorpayOrderId: existing.razorpayOrderId,
+          paymentId:       existing._id,
         },
       });
     }
 
-    const stripeCurrency = CURRENCY_MAP[currency?.toUpperCase()] || "usd";
+    // ── Create Razorpay Order ──────────────────────────
+    // amount must be in paise (or smallest unit of currency)
+    const order = await razorpay.orders.create({
+      amount:   toSmallestUnit(amount, upperCurrency),
+      currency: upperCurrency,
+      receipt:  invoiceId,                    // echoed back in webhooks — useful for matching
+      notes: {
+        invoiceId,
+        invoiceNumber,
+        userId:   req.userId,
+        clientId: clientId || "",
+        clientName:  clientName  || "",
+        clientEmail: clientEmail || "",
+      },
+    });
 
-    // ── Create Stripe Price object ─────────────────────
-    // Stripe works in smallest currency unit — multiply by 100 for USD/EUR/GBP
-    // Exception: JPY and a few others don't use decimals
-    const zeroDecimalCurrencies = ["jpy", "krw", "vnd", "clp"];
-    const unitAmount = zeroDecimalCurrencies.includes(stripeCurrency)
-      ? Math.round(amount)
-      : Math.round(amount * 100);
-
-    // ── Create Stripe Payment Link ─────────────────────
-    const paymentLink = await stripe.paymentLinks.create({
-      line_items: [
-        {
-          price_data: {
-            currency:     stripeCurrency,
-            product_data: {
-              name:        `Invoice ${invoiceNumber}`,
-              description: `Payment to ${req.user?.name || "Freelancer"} via InvoiceHive`,
-            },
-            unit_amount: unitAmount,
-          },
-          quantity: 1,
-        },
-      ],
-      // Store our IDs in Stripe metadata — we get them back in webhooks
-      metadata: {
+    // ── Build hosted Razorpay checkout URL ─────────────
+    // Razorpay doesn't have a "Payment Links" API like razorpay for orders,
+    // but it does have a Payment Links product — we use that here so the
+    // client can pay via a simple URL without any frontend SDK.
+    // Alternatively, if you want the JS checkout, return orderId + key to frontend.
+    const paymentLink = await razorpay.paymentLink.create({
+      amount:      toSmallestUnit(amount, upperCurrency),
+      currency:    upperCurrency,
+      description: `Invoice ${invoiceNumber}`,
+      reference_id: invoiceId,               // idempotency key on Razorpay side
+      customer: {
+        name:  clientName  || "Client",
+        email: clientEmail || undefined,
+      },
+      notify: {
+        email: !!clientEmail,
+        sms:   false,
+      },
+      reminder_enable: true,
+      notes: {
         invoiceId,
         userId:   req.userId,
-        clientId: req.body.clientId || "",
+        clientId: clientId || "",
       },
-      // Pre-fill client email on Stripe checkout
-      ...(clientEmail && {
-        customer_creation: "always",
-        automatic_tax:     { enabled: false },
-      }),
-      // Where to redirect after payment
-      after_completion: {
-        type:     "redirect",
-        redirect: {
-          url: `${process.env.CLIENT_URL}/pay/success?invoice=${invoiceId}`,
-        },
-      },
-      // Collect billing address
-      billing_address_collection: "auto",
+      callback_url:    `${process.env.CLIENT_URL}/pay/success?invoice=${invoiceId}`,
+      callback_method: "get",
     });
 
-    // ── Save payment record ────────────────────────────
+    // ── Persist payment record ─────────────────────────
     const payment = await Payment.create({
       invoiceId,
-      userId:   req.userId,
-      clientId: req.body.clientId || "",
-      stripePaymentLinkId:  paymentLink.id,
-      stripePaymentLinkUrl: paymentLink.url,
+      userId:    req.userId,
+      clientId:  clientId || "",
+      razorpayOrderId: order.id,
+      checkoutUrl:     paymentLink.short_url,  // e.g. https://rzp.io/i/xxxx
       amount,
-      currency: currency?.toUpperCase() || "USD",
-      status:   "pending",
+      currency:  upperCurrency,
+      status:    "pending",
     });
 
-    // ── Tell Invoice Service about the link ───────────
-    // So it can embed the URL in the PDF and email
+    // ── Tell Invoice Service about the checkout URL ────
     await notifyInvoiceService(invoiceId, {
-      stripePaymentLinkId:  paymentLink.id,
-      stripePaymentLinkUrl: paymentLink.url,
+      razorpayOrderId: order.id,
+      checkoutUrl:     paymentLink.short_url,
     });
 
     res.status(201).json({
       success: true,
-      message: "Payment link created",
+      message: "Payment order created",
       data: {
-        paymentLinkUrl: paymentLink.url,
-        paymentLinkId:  paymentLink.id,
-        paymentId:      payment._id,
+        checkoutUrl:     paymentLink.short_url,
+        razorpayOrderId: order.id,
+        paymentId:       payment._id,
+        // Also expose key_id so frontend can launch Razorpay JS checkout if preferred
+        razorpayKeyId:   process.env.RAZORPAY_KEY_ID,
       },
     });
   } catch (err) {
-    // Stripe errors have a specific shape
-    if (err.type?.startsWith("Stripe")) {
+    // Razorpay SDK throws plain Error objects with err.error shape
+    if (err.error) {
       return res.status(400).json({
         success: false,
-        message: `Stripe error: ${err.message}`,
-        code:    err.code,
+        message: err.error.description || "Razorpay error",
+        code:    err.error.code,
       });
     }
     next(err);
@@ -179,7 +205,7 @@ export const getPaymentStats = async (req, res, next) => {
   }
 };
 
-// ── GET /payments/:invoiceId ──────────────────────────────────────────────────
+// ── GET /payments/invoice/:invoiceId ──────────────────────────────────────────
 export const getPaymentByInvoice = async (req, res, next) => {
   try {
     const payment = await Payment.findOne({
@@ -216,25 +242,25 @@ export const refundPayment = async (req, res, next) => {
       });
     }
 
-    if (!payment.stripePaymentIntentId) {
+    if (!payment.razorpayPaymentId) {
       return res.status(400).json({
         success: false,
-        message: "No Stripe payment intent found — cannot refund",
+        message: "No Razorpay payment ID found — cannot refund",
       });
     }
 
-    // Create Stripe refund
-    const refund = await stripe.refunds.create({
-      payment_intent: payment.stripePaymentIntentId,
-      reason:         req.body.reason || "requested_by_customer",
+    // ── Create Razorpay Refund ─────────────────────────
+    // amount in paise; omitting it triggers a full refund
+    const refund = await razorpay.payments.refund(payment.razorpayPaymentId, {
+      speed: "normal",  // "normal" (3-5 days) or "optimum" (instant, higher fee)
+      notes: { reason: req.body.reason || "requested_by_customer" },
     });
 
-    // Update payment record
-    payment.status     = "refunded";
-    payment.refundedAt = new Date();
+    payment.status          = "refunded";
+    payment.refundedAt      = new Date();
+    payment.razorpayRefundId = refund.id;
     await payment.save();
 
-    // Publish refund event
     await publish("payment.refunded", {
       invoiceId: payment.invoiceId,
       userId:    payment.userId,
@@ -243,16 +269,20 @@ export const refundPayment = async (req, res, next) => {
       refundId:  refund.id,
     });
 
-    res.json({ success: true, message: "Refund processed", data: { refundId: refund.id } });
+    res.json({ success: true, message: "Refund initiated", data: { refundId: refund.id } });
   } catch (err) {
-    if (err.type?.startsWith("Stripe")) {
-      return res.status(400).json({ success: false, message: `Stripe error: ${err.message}` });
+    if (err.error) {
+      return res.status(400).json({
+        success: false,
+        message: err.error.description || "Razorpay refund error",
+        code:    err.error.code,
+      });
     }
     next(err);
   }
 };
 
-// ── Helper: notify invoice service of payment link ────────────────────────────
+// ── Helper: notify Invoice Service of checkout URL ────────────────────────────
 const notifyInvoiceService = async (invoiceId, linkData) => {
   try {
     await axios.post(
@@ -264,6 +294,7 @@ const notifyInvoiceService = async (invoiceId, linkData) => {
       }
     );
   } catch (err) {
-    console.warn("Could not update invoice with payment link:", err.message);
+    // Non-fatal — invoice service can be synced later
+    console.warn("Could not update invoice with checkout URL:", err.message);
   }
 };

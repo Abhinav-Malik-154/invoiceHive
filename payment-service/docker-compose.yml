@@ -14,8 +14,9 @@ services:
       - JWT_ACCESS_SECRET=dev_access_secret_change_in_prod
 
       # Stripe
-      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
-      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET}
+      - RAZORPAY_WEBHOOK_SECRET=${RAZORPAY_WEBHOOK_SECRET}
 
       # RabbitMQ (docker container)
       - RABBITMQ_URL=amqp://rabbitmq:5672
