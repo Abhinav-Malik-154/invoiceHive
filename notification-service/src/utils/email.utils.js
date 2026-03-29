@@ -45,8 +45,7 @@ export const sendInvoiceSentEmail = async (data) => {
   const {
     clientEmail, clientName, fromName,
     invoiceNumber, total, currency,
-    invoiceId,
-    invoiceId,
+    
     dueDate, pdfUrl, paymentUrl,
   } = data;
 
