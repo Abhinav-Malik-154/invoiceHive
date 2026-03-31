@@ -9,6 +9,9 @@ import {
   blacklistAccessToken,
 } from "../utils/jwt.utils.js";
 import { sendPasswordResetEmail, sendWelcomeEmail } from "../utils/email.utils.js";
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
 
 // ── POST /auth/register ───────────────────────────────────────────────────────
 export const register = async (req, res, next) => {

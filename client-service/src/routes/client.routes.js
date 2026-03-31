@@ -13,6 +13,10 @@ import {
 } from "../controllers/client.controller.js";
 import { protect } from "../middleware/auth.middleware.js";
 import {
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+
   validate,
   createClientSchema,
   updateClientSchema,

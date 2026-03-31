@@ -1,5 +1,8 @@
 import mongoose from "mongoose";
 import Client from "../models/client.model.js";
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
 
 // ── POST /clients ─────────────────────────────────────────────────────────────
 export const createClient = async (req, res, next) => {

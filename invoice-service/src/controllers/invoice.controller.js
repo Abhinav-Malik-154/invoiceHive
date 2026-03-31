@@ -4,6 +4,9 @@ import Invoice from "../models/invoice.model.js";
 import { generateInvoicePDF } from "../utils/pdf.utils.js";
 import { uploadPDF, getPresignedUrl } from "../config/minio.js";
 import { publish } from "../config/rabbitmq.js";
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
 
 // ── POST /invoices ────────────────────────────────────────────────────────────
 export const createInvoice = async (req, res, next) => {
