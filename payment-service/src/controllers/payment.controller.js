@@ -2,6 +2,9 @@ import axios from "axios";
 import razorpay from "../config/razorpay.js";
 import Payment from "../models/payment.model.js";
 import { publish } from "../config/rabbitmq.js";
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
 
 // Currency → ISO code (uppercase) — Razorpay supports these natively
 // Full list: https://razorpay.com/docs/payments/payments/international/
