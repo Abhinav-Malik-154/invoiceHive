@@ -15,6 +15,9 @@ import { oauthSuccess, oauthFailure } from "../controllers/oauth.controller.js";
 import { protect } from "../middleware/auth.middleware.js";
 import { loginLimiter, registerLimiter, resetLimiter } from "../middleware/rateLimiter.js";
 import { validate, registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema } from "../utils/validation.js";
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
 
 const router = Router();
 

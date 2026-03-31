@@ -6,7 +6,9 @@ import {
 } from "../controllers/invoice.controller.js";
 import { protect, internalOnly } from "../middleware/auth.middleware.js";
 import { validate, createInvoiceSchema, updateInvoiceSchema, listInvoicesSchema } from "../utils/validation.js";
+import { createRequire } from 'module';
 
+const require = createRequire(import.meta.url);
 
 const router = Router();
 

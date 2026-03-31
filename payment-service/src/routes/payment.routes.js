@@ -6,6 +6,9 @@ import {
 import { razorpayWebhook } from "../controllers/webhook.controller.js";
 import { protect } from "../middleware/auth.middleware.js";
 import { validate, createPaymentOrderSchema, refundSchema } from "../utils/validation.js";
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
 
 const router = Router();
 

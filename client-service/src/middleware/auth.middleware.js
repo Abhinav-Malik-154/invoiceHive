@@ -1,6 +1,9 @@
 import jwt from "jsonwebtoken";
 import fs from "fs";
 import path from "path";
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
 
 // Load public key for verification
 const JWT_PUBLIC_KEY = fs.readFileSync(path.join(process.cwd(), "public.key"), "utf8");
