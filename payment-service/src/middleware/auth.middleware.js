@@ -1,6 +1,9 @@
 import jwt from "jsonwebtoken";
 import path from "path";
 import fs from "fs";
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
 
 const JWT_PUBLIC_KEY = fs.readFileSync(path.join(process.cwd(), "public.key"), "utf8");
 export const protect = (req, res, next) => {

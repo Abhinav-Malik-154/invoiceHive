@@ -1,5 +1,8 @@
 import { verifyAccessToken, isTokenBlacklisted } from "../utils/jwt.utils.js";
 import User from "../models/user.model.js";
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
 
 // ── Protect routes — verifies JWT from Authorization header ───────────────────
 // All other microservices will use this same pattern
